@@ -1,4 +1,4 @@
-diff --git a/KernelSU-Next/kernel/feature/kernel_umount.c b/KernelSU-Next/kernel/feature/kernel_umount.c
+diff --git a/kernel/feature/kernel_umount.c b/kernel/feature/kernel_umount.c
 index 317575c53ec7..a8adaab535aa 100644
 --- a/kernel/feature/kernel_umount.c
 +++ b/kernel/feature/kernel_umount.c
