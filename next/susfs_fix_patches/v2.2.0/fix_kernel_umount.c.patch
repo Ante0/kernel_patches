@@ -1,7 +1,7 @@
 diff --git a/KernelSU-Next/kernel/feature/kernel_umount.c b/KernelSU-Next/kernel/feature/kernel_umount.c
 index 317575c53ec7..a8adaab535aa 100644
---- a/KernelSU-Next/kernel/feature/kernel_umount.c
-+++ b/KernelSU-Next/kernel/feature/kernel_umount.c
+--- a/kernel/feature/kernel_umount.c
++++ b/kernel/feature/kernel_umount.c
 @@ -106,30 +106,6 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
  		return 0;
  	}
