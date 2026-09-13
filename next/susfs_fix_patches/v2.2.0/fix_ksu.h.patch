@@ -1,7 +1,7 @@
-diff --git a/ksu.h b/ksu.h.2
+diff --git a/kernel/include/ksu.h b/kernel/include/ksu.h
 index 4af4acb..d8bd9c2 100755
---- a/ksu.h
-+++ b/ksu.h.2
+--- a/kernel/include/ksu.h
++++ b/kernel/include/ksu.h
 @@ -13,12 +13,8 @@ extern bool allow_shell;
  extern struct selinux_policy *backup_sepolicy;
  extern bool ksu_no_custom_rc;

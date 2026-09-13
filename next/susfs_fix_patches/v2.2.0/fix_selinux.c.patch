@@ -1,7 +1,7 @@
-diff --git a/selinux.c b/selinux.c.2
+diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
 index f2599fe..6c2687d 100755
---- a/selinux.c
-+++ b/selinux.c.2
+--- a/kernel/selinux/selinux.c
++++ b/kernel/selinux/selinux.c
 @@ -7,75 +7,8 @@
  #include "ksu.h"
  #include "infra/symbol_resolver.h"
