@@ -1,8 +1,8 @@
 diff --git a/kernel/supercall/supercall.c b/kernel/supercall/supercall.c
-index 1a397320..66f7e9e0 100644
+index d82df07..319e505 100755
 --- a/kernel/supercall/supercall.c
 +++ b/kernel/supercall/supercall.c
-@@ -83,169 +83,31 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
+@@ -119,169 +119,33 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
      kfree(tw);
  }
  
@@ -15,8 +15,9 @@ index 1a397320..66f7e9e0 100644
 -    unsigned int cmd = (unsigned int)PT_REGS_PARM3(real_regs);
 -    unsigned long arg4 = (unsigned long)PT_REGS_SYSCALL_PARM4(real_regs);
 -    unsigned long reply = (unsigned long)arg4;
--
--    /* Check if this is a request to install KSU fd */
++    struct ksu_install_fd_tw *tw;
+ 
+     /* Check if this is a request to install KSU fd */
 -    if (magic1 == KSU_INSTALL_MAGIC1 && magic2 == KSU_INSTALL_MAGIC2) {
 -        struct ksu_install_fd_tw *tw;
 -
@@ -45,19 +46,16 @@ index 1a397320..66f7e9e0 100644
 -            if (copy_to_user((void __user *)arg4, &reply, sizeof(reply)))
 -                pr_info("sys_reboot: reply fail\n");
 -        }
-+    struct ksu_install_fd_tw *tw;
  
 +    tw = kzalloc(sizeof(*tw), GFP_KERNEL);
 +    if (!tw)
          return 0;
 -    }
- 
+-
 -    if (magic2 == GET_SULOG_DUMP_V2) {
 -        if (current_uid().val != 0)
 -            return 0;
-+    tw->outp = (int __user *)(*arg);
-+    tw->cb.func = ksu_install_fd_tw_func;
- 
+-
 -        int ret = ksu_sulog_handle_compat_dump((void __user *)arg4);
 -        if (ret)
 -            return 0;
@@ -88,10 +86,12 @@ index 1a397320..66f7e9e0 100644
 -        char version_buf[65];
 -        static char original_release_buf[65] = {0};
 -        static char original_version_buf[65] = {0};
--
+ 
 -        // basically void * void __user * void __user *arg
 -        void __user **ppptr = (void __user **)arg4;
--
++    tw->outp = (int __user *)(*arg);
++    tw->cb.func = ksu_install_fd_tw_func;
+ 
 -        // user pointer storage
 -        // init this as zero so this works on 32-on-64 compat (LE)
 -        uint64_t u_pptr = 0;

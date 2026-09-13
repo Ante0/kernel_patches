@@ -1,0 +1,37 @@
+diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
+index 9bb8237..90a3c49 100755
+--- a/kernel/supercall/dispatch.c
++++ b/kernel/supercall/dispatch.c
+@@ -46,9 +46,6 @@ static int do_get_info(void __user *arg)
+ 
+ #ifdef MODULE
+     cmd.flags |= KSU_GET_INFO_FLAG_LKM;
+-    if (ksu_bundled) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_BUNDLED;
+-    }
+ #endif
+ 
+     if (ksuver_override)
+@@ -57,9 +54,6 @@ static int do_get_info(void __user *arg)
+     if (is_manager()) {
+         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
+     }
+-    if (ksu_late_loaded) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
+-    }
+ #ifdef EXPECTED_SIZE2
+     cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
+ #endif
+@@ -751,11 +745,7 @@ static int do_get_hook_mode(void __user *arg)
+ {
+     struct ksu_get_hook_mode_cmd cmd = {0};
+ 
+-#ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
+-    strscpy(cmd.mode, "Tracepoint", sizeof(cmd.mode));
+-#else
+-    strscpy(cmd.mode, "Kprobes", sizeof(cmd.mode));
+-#endif
++    strscpy(cmd.mode, "Inline (SuSFS)", sizeof(cmd.mode));
+ 
+     if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+         pr_err("get_hook_mode: copy_to_user failed\n");
