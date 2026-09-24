@@ -1,8 +1,8 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index cb7f51e..a00281d 100755
+index 38f0f385..a00281d8 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
-@@ -4,25 +4,13 @@ kernelsu-objs += feature/kernel_umount.o
+@@ -4,28 +4,13 @@ kernelsu-objs += feature/kernel_umount.o
  kernelsu-objs += feature/sulog.o
  kernelsu-objs += feature/sucompat.o
  
@@ -17,6 +17,9 @@ index cb7f51e..a00281d 100755
 -else ifeq ($(CONFIG_X86_64),y)
 -kernelsu-objs += hook/x86_64/patch_memory.o
 -kernelsu-objs += hook/x86_64/syscall_hook.o
+-else ifeq ($(CONFIG_RISCV),y)
+-kernelsu-objs += hook/riscv64/patch_memory.o
+-kernelsu-objs += hook/riscv64/syscall_hook.o
 -endif
  kernelsu-objs += extras.o
  
