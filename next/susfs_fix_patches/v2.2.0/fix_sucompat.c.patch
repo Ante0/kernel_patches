@@ -1,6 +1,6 @@
-diff --git a/kernel/feature/sucompat.c.1 b/kernel/feature/sucompat.c
+diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
 index e1a589a6..efad4b4c 100644
---- a/kernel/feature/sucompat.c.1
+--- a/kernel/feature/sucompat.c
 +++ b/kernel/feature/sucompat.c
 @@ -24,28 +24,39 @@
  #include "klog.h" // IWYU pragma: keep
