@@ -1,14 +1,14 @@
 diff --git a/kernel/feature/sucompat.c.1 b/kernel/feature/sucompat.c
-index e1a589a6..3bc2e4e1 100644
+index e1a589a6..efad4b4c 100644
 --- a/kernel/feature/sucompat.c.1
 +++ b/kernel/feature/sucompat.c
-@@ -24,28 +24,40 @@
+@@ -24,28 +24,39 @@
  #include "klog.h" // IWYU pragma: keep
  #include "runtime/ksud.h"
  #include "feature/sucompat.h"
 +#include "feature/adb_root.h"
  #include "policy/app_profile.h"
- #include "hook/syscall_hook.h"
+-#include "hook/syscall_hook.h"
  #include "supercall/supercall.h"
  #include "sulog/event.h"
 -#include "ksu.h"
@@ -49,7 +49,7 @@ index e1a589a6..3bc2e4e1 100644
  	pr_info("su_compat: set to %d\n", enable);
  	return 0;
  }
-@@ -80,209 +92,219 @@ static char __user *ksud_user_path(void)
+@@ -80,209 +91,219 @@ static char __user *ksud_user_path(void)
  	return userspace_stack_buffer(ksud_path, sizeof(ksud_path));
  }
  
