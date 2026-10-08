@@ -3932,50 +3932,6 @@ index 000000000..1c87ae194
 +    }
 +    up_write(&mount_list_lock);
 +}
-diff --git a/kernel/supercall/dispatch.c.rej b/kernel/supercall/dispatch.c.rej
-new file mode 100644
-index 000000000..3516149c2
---- /dev/null
-+++ b/kernel/supercall/dispatch.c.rej
-@@ -0,0 +1,38 @@
-+--- kernel/supercall/dispatch.c
-++++ kernel/supercall/dispatch.c
-+@@ -44,17 +45,11 @@ static int do_get_info(void __user *arg)
-+ 
-+ #ifdef MODULE
-+     cmd.flags |= KSU_GET_INFO_FLAG_LKM;
-+-    if (ksu_bundled) {
-+-        cmd.flags |= KSU_GET_INFO_FLAG_BUNDLED;
-+-    }
-+ #endif
-+ 
-+     if (is_manager()) {
-+         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
-+     }
-+-    if (ksu_late_loaded) {
-+-        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
-+-    }
-+ #ifdef EXPECTED_SIZE2
-+     cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
-+ #endif
-+@@ -75,17 +70,11 @@ static int do_get_info_legacy(void __user *arg)
-+ 
-+ #ifdef MODULE
-+     cmd.flags |= KSU_GET_INFO_FLAG_LKM;
-+-    if (ksu_bundled) {
-+-        cmd.flags |= KSU_GET_INFO_FLAG_BUNDLED;
-+-    }
-+ #endif
-+ 
-+     if (is_manager()) {
-+         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
-+     }
-+-    if (ksu_late_loaded) {
-+-        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
-+-    }
-+ #ifdef EXPECTED_SIZE2
-+     cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
-+ #endif
 diff --git a/kernel/supercall/supercall.c b/kernel/supercall/supercall.c
 index 6db264956..40a56fc41 100644
 --- a/kernel/supercall/supercall.c
