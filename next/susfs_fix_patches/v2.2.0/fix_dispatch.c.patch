@@ -1,6 +1,6 @@
-diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
-index 9bb8237..90a3c49 100755
---- a/kernel/supercall/dispatch.c
+diff --git a/kernel/supercall/dispatch.c.1 b/kernel/supercall/dispatch.c
+index 9232d810..f2fbd58f 100644
+--- a/kernel/supercall/dispatch.c.1
 +++ b/kernel/supercall/dispatch.c
 @@ -46,9 +46,6 @@ static int do_get_info(void __user *arg)
  
@@ -19,10 +19,96 @@ index 9bb8237..90a3c49 100755
 -    if (ksu_late_loaded) {
 -        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
 -    }
- #ifdef EXPECTED_SIZE2
-     cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
+     cmd.features = KSU_FEATURE_MAX;
+     cmd.uapi_version = KERNEL_SU_UAPI_VERSION;
+ 
+@@ -77,17 +71,11 @@ static int do_get_info_legacy(void __user *arg)
+ 
+ #ifdef MODULE
+     cmd.flags |= KSU_GET_INFO_FLAG_LKM;
+-    if (ksu_bundled) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_BUNDLED;
+-    }
  #endif
-@@ -751,11 +745,7 @@ static int do_get_hook_mode(void __user *arg)
+ 
+     if (is_manager()) {
+         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
+     }
+-    if (ksu_late_loaded) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
+-    }
+     cmd.features = KSU_FEATURE_MAX;
+ 
+     if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+@@ -491,6 +479,67 @@ static int do_manage_mark(void __user *arg)
+     return 0;
+ }
+ 
++int ksu_handle_toolkit_reboot(int magic2, unsigned int cmd, void __user *arg)
++{
++    unsigned long reply = (unsigned long)arg;
++
++    if (magic2 == CHANGE_MANAGER_UID) {
++        /* only root is allowed for this command */
++        if (current_uid().val != 0)
++            return -EPERM;
++        pr_info("ksu_handle_toolkit_reboot: ksu_set_manager_appid to: %d\n", cmd);
++        ksu_set_manager_appid(cmd);
++        if (cmd == ksu_get_manager_appid()) {
++            if (copy_to_user(arg, &reply, sizeof(reply))) {
++                pr_info("ksu_handle_toolkit_reboot: reply fail\n");
++                return -EFAULT;
++            }
++        }
++        return 0;
++    }
++
++    if (magic2 == GET_SULOG_DUMP_V2) {
++        /* only root is allowed for this command */
++        if (current_uid().val != 0)
++            return -EPERM;
++
++        int ret = ksu_sulog_handle_compat_dump(arg);
++        if (ret)
++            return ret;
++
++        if (copy_to_user(arg, &reply, sizeof(reply))) {
++            pr_info("ksu_handle_toolkit_reboot: reply fail\n");
++            return -EFAULT;
++        }
++        return 0;
++    }
++
++    if (magic2 == CHANGE_KSUVER) {
++        /* only root is allowed for this command */
++        if (current_uid().val != 0)
++            return -EPERM;
++        pr_info("ksu_handle_toolkit_reboot: ksu_change_ksuver to: %d\n", cmd);
++        ksuver_override = cmd;
++        if (copy_to_user(arg, &reply, sizeof(reply))) {
++            pr_info("ksu_handle_toolkit_reboot: reply fail\n");
++            return -EFAULT;
++        }
++        return 0;
++    }
++
++    if (magic2 == CHANGE_SPOOF_UNAME) {
++        // we write our error on **
++        reply = 0;
++        if (copy_to_user(arg, &reply, sizeof(reply))) {
++            pr_info("ksu_handle_toolkit_reboot: reply fail\n");
++            return -EFAULT;
++        }
++        return 0;
++    }
++
++    return -EINVAL;
++}
++
+ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
+ {
+     if (magic1 != KSU_INSTALL_MAGIC1) {
+@@ -764,11 +813,7 @@ static int do_get_hook_mode(void __user *arg)
  {
      struct ksu_get_hook_mode_cmd cmd = {0};
  
