@@ -575,7 +575,7 @@ index 7e337abff..8b6e0b3cb 100644
      pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
  
 diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
-index 9a09ec85c..b1d349b26 100644
+index 033cab8dc..05ff5062c 100644
 --- a/kernel/feature/selinux_hide.c
 +++ b/kernel/feature/selinux_hide.c
 @@ -1,6 +1,4 @@
@@ -593,7 +593,7 @@ index 9a09ec85c..b1d349b26 100644
  // security/selinux/include/security.h
  #include <security.h>
  #include <ss/context.h>
-@@ -22,266 +21,29 @@
+@@ -22,252 +21,27 @@
  #include <ss/conditional.h>
  #include "avc.h"
  #include "klog.h" // IWYU pragma: keep
@@ -811,8 +811,8 @@ index 9a09ec85c..b1d349b26 100644
 -typedef int (*setprocattr_fn)(const char *name, void *value, size_t size);
 -static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
 -{
--    int error;
--    u32 mysid, sid, tmp;
+-    int error, perm_error;
+-    u32 mysid, sid;
 -    char *str = value;
 -    if (likely(current_uid().val < 10000)) {
 -        goto call_orig;
@@ -821,17 +821,6 @@ index 9a09ec85c..b1d349b26 100644
 -    if (strcmp(name, "current")) {
 -        goto call_orig;
 -    }
--    mysid = current_sid();
--
--#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
--    error = avc_has_perm(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
--#else
--    error = avc_has_perm(&selinux_state, mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
--#endif
--    if (error) {
--        return error;
--    }
--
 -    if (size && str[0] && str[0] != '\n') {
 -        if (str[size - 1] == '\n') {
 -            str[size - 1] = 0;
@@ -839,19 +828,18 @@ index 9a09ec85c..b1d349b26 100644
 -        }
 -#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 -        error = security_context_to_sid_with_policy(backup_sepolicy, str, size, &sid, SECSID_NULL, GFP_KERNEL);
--#else
--        error = security_context_to_sid(&fake_state, str, size, &sid, GFP_KERNEL);
--#endif
--        if (error) {
--            return error;
--        } else {
--            // sync to global sidtab
--#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
--            security_context_to_sid(str, size, &tmp, GFP_KERNEL);
  #else
--            security_context_to_sid(&selinux_state, str, size, &tmp, GFP_KERNEL);
+-        error = security_context_to_sid(&fake_state, str, size, &sid, GFP_KERNEL);
 +struct selinux_state fake_state;
  #endif
+-        if (error) {
+-            mysid = current_sid();
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+-            perm_error = avc_has_perm(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
+-#else
+-            perm_error = avc_has_perm(&selinux_state, mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
+-#endif
+-            return perm_error ?: error;
 -        }
 -    }
 -
@@ -864,12 +852,9 @@ index 9a09ec85c..b1d349b26 100644
 +DEFINE_STATIC_KEY_FALSE(fake_status_initialize_key);
 +struct page *fake_status = NULL;
  
--static void initialize_fake_status()
-+void initialize_fake_status()
+ static void initialize_fake_status()
  {
-     mutex_lock(&selinux_state.status_lock);
-     if (fake_status)
-@@ -292,7 +54,7 @@ static void initialize_fake_status()
+@@ -280,7 +54,7 @@ static void initialize_fake_status()
      }
  
      struct selinux_kernel_status *status = page_address(selinux_state.status_page);
@@ -878,7 +863,7 @@ index 9a09ec85c..b1d349b26 100644
          pr_warn("initialize_fake_status: skip not enforcing\n");
          goto out;
      }
-@@ -305,22 +67,6 @@ static void initialize_fake_status()
+@@ -293,22 +67,6 @@ static void initialize_fake_status()
  
      struct selinux_kernel_status *new_status = page_address(new_page);
      memcpy(new_status, status, sizeof(*status));
@@ -901,7 +886,7 @@ index 9a09ec85c..b1d349b26 100644
  
      fake_status = new_page;
      pr_info("initialize_fake_status initialized: sequence=%d, policyload=%d, enforcing=%d\n", new_status->sequence,
-@@ -330,125 +76,38 @@ static void initialize_fake_status()
+@@ -318,125 +76,38 @@ static void initialize_fake_status()
      mutex_unlock(&selinux_state.status_lock);
  }
  
@@ -1040,7 +1025,7 @@ index 9a09ec85c..b1d349b26 100644
  }
  
  static int selinux_hide_feature_get(u64 *value)
-@@ -473,10 +132,11 @@ static int selinux_hide_feature_set(u64 value)
+@@ -461,10 +132,11 @@ static int selinux_hide_feature_set(u64 value)
          }
      } else {
          if (ksu_selinux_hide_running) {
@@ -1053,7 +1038,7 @@ index 9a09ec85c..b1d349b26 100644
      mutex_unlock(&selinux_hide_mutex);
      return ret;
  }
-@@ -488,65 +148,18 @@ static const struct ksu_feature_handler selinux_hide_handler = {
+@@ -476,65 +148,18 @@ static const struct ksu_feature_handler selinux_hide_handler = {
      .set_handler = selinux_hide_feature_set,
  };
  
@@ -1120,7 +1105,7 @@ index 9a09ec85c..b1d349b26 100644
          ksu_selinux_hide_running = false;
      }
      mutex_unlock(&selinux_hide_mutex);
-@@ -650,7 +263,7 @@ static int string_to_context_struct(struct policydb *pol, struct sidtab *sidtabp
+@@ -638,7 +263,7 @@ static int string_to_context_struct(struct policydb *pol, struct sidtab *sidtabp
      return rc;
  }
  
@@ -1129,7 +1114,7 @@ index 9a09ec85c..b1d349b26 100644
                                                 u32 *sid, u32 def_sid, gfp_t gfp_flags)
  {
      struct policydb *policydb;
-@@ -757,7 +370,7 @@ static int sidtab_entry_to_string(struct policydb *p, struct sidtab *sidtab, str
+@@ -745,7 +370,7 @@ static int sidtab_entry_to_string(struct policydb *p, struct sidtab *sidtab, str
      return rc;
  }
  
@@ -1138,7 +1123,7 @@ index 9a09ec85c..b1d349b26 100644
                                                 u32 *scontext_len)
  {
      struct policydb *policydb;
-@@ -1130,7 +743,7 @@ static void context_struct_compute_av(struct policydb *policydb, struct context
+@@ -1118,7 +743,7 @@ static void context_struct_compute_av(struct policydb *policydb, struct context
      type_attribute_bounds_av(policydb, scontext, tcontext, tclass, avd);
  }
  
