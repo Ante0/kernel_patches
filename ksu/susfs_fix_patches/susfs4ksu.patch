@@ -575,7 +575,7 @@ index 7e337abff..8b6e0b3cb 100644
      pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
  
 diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
-index 033cab8dc..05ff5062c 100644
+index 033cab8dc..b1d349b26 100644
 --- a/kernel/feature/selinux_hide.c
 +++ b/kernel/feature/selinux_hide.c
 @@ -1,6 +1,4 @@
@@ -593,7 +593,7 @@ index 033cab8dc..05ff5062c 100644
  // security/selinux/include/security.h
  #include <security.h>
  #include <ss/context.h>
-@@ -22,252 +21,27 @@
+@@ -22,254 +21,29 @@
  #include <ss/conditional.h>
  #include "avc.h"
  #include "klog.h" // IWYU pragma: keep
@@ -852,8 +852,11 @@ index 033cab8dc..05ff5062c 100644
 +DEFINE_STATIC_KEY_FALSE(fake_status_initialize_key);
 +struct page *fake_status = NULL;
  
- static void initialize_fake_status()
+-static void initialize_fake_status()
++void initialize_fake_status()
  {
+     mutex_lock(&selinux_state.status_lock);
+     if (fake_status)
 @@ -280,7 +54,7 @@ static void initialize_fake_status()
      }
  
