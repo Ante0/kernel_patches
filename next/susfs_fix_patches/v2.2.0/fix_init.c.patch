@@ -1,5 +1,5 @@
 diff --git a/kernel/core/init.c b/kernel/core/init.c
-index 39a34e3b..088b4ac5 100644
+index cf12e428..3dcd603a 100644
 --- a/kernel/core/init.c
 +++ b/kernel/core/init.c
 @@ -5,6 +5,7 @@
@@ -10,7 +10,7 @@ index 39a34e3b..088b4ac5 100644
  
  #include "policy/allowlist.h"
  #include "policy/app_profile.h"
-@@ -18,12 +19,12 @@
+@@ -18,21 +19,14 @@
  #include "ksu.h"
  #include "infra/file_wrapper.h"
  #include "selinux/selinux.h"
@@ -18,14 +18,23 @@ index 39a34e3b..088b4ac5 100644
  #include "feature/adb_root.h"
  #include "feature/selinux_hide.h"
  #include "feature/module_blacklist.h"
+ #include "feature/shell_su_adb_only.h"
  #include "feature/sulog.h"
 -#include "infra/symbol_resolver.h"
 +#include "hook/setuid_hook.h"
 +#include "feature/sucompat.h"
  
- #if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
- #include <asm/cpufeature.h>
-@@ -94,27 +95,6 @@ int __init kernelsu_init(void)
+-#if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
+-#include <asm/cpufeature.h>
+-#include <linux/version.h>
+-#ifndef X86_FEATURE_INDIRECT_SAFE
+-#error "FATAL: Your kernel is missing the indirect syscall bypass patches!"
+-#endif
+-#endif
+ 
+ // workaround for A12-5.10 kernel
+ // Some third-party kernel (e.g. linegaeOS) uses wrong toolchain, which supports
+@@ -95,27 +89,6 @@ int __init kernelsu_init(void)
  #else
  	pr_info("welcome to KernelSU version " __stringify(KERNEL_SU_VERSION) "\n");
  #endif
@@ -53,7 +62,7 @@ index 39a34e3b..088b4ac5 100644
  
  #ifdef CONFIG_KSU_DEBUG
  	pr_alert("*************************************************************");
-@@ -125,6 +105,7 @@ int __init kernelsu_init(void)
+@@ -126,6 +99,7 @@ int __init kernelsu_init(void)
  	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
  	pr_alert("*************************************************************");
  #endif
@@ -61,14 +70,14 @@ index 39a34e3b..088b4ac5 100644
  	if (allow_shell) {
  		pr_alert("shell is allowed at init!");
  	}
-@@ -135,81 +116,42 @@ int __init kernelsu_init(void)
+@@ -136,82 +110,44 @@ int __init kernelsu_init(void)
  		return -ENOSYS;
  	}
  
 -	ksu_init_symbol_resolver();
 -	ksu_syscall_hook_init();
 +#ifdef CONFIG_KSU_SUSFS
-+	susfs_init();
++    susfs_init();
 +#endif // #ifdef KSU_SUSFS
  
 -	// Block modules early, before vendor modules are loaded in second stage.
@@ -79,6 +88,7 @@ index 39a34e3b..088b4ac5 100644
 -	ksu_adb_root_init();
 -	ksu_lsm_hook_init();
 -	ksu_selinux_hide_init();
+-	ksu_shell_su_adb_only_init();
  
  	ksu_supercalls_init();
 -	ksu_app_profile_init();
@@ -94,30 +104,31 @@ index 39a34e3b..088b4ac5 100644
 -		// with KSU SELinux domain before enforcing SELinux, so it
 -		// can continue to access /data/app etc. after enforcement.
 -		escape_to_root_for_init();
--
+ 
 -		ksu_allowlist_init();
 -		ksu_load_allow_list();
++    ksu_sucompat_init();
  
 -		ksu_syscall_hook_manager_init();
-+	ksu_sucompat_init();
++    ksu_setuid_hook_init();
  
 -		ksu_throne_tracker_init();
 -		ksu_observer_init();
 -		ksu_file_wrapper_init();
-+	ksu_setuid_hook_init();
++    ksu_sulog_init();
  
 -		ksu_boot_completed = true;
 -		track_throne(false);
-+	ksu_sulog_init();
++    ksu_adb_root_init();
  
 -		ksu_feature_apply_forced();
-+	ksu_adb_root_init();
++    ksu_selinux_hide_init();
  
 -		if (!getenforce()) {
 -			pr_info("Permissive SELinux, enforcing\n");
 -			setenforce(true);
 -		}
-+	ksu_selinux_hide_init();
++    ksu_shell_su_adb_only_init();
  
 -	} else {
 -		ksu_syscall_hook_manager_init();
@@ -156,9 +167,11 @@ index 39a34e3b..088b4ac5 100644
  
  	// Wait for any in-flight RCU readers (e.g. handler traversing allow_list)
  	synchronize_rcu();
-@@ -222,10 +164,13 @@ void __exit kernelsu_exit(void)
+@@ -224,11 +160,15 @@ void __exit kernelsu_exit(void)
  	ksu_allowlist_exit();
  
+ 	ksu_shell_su_adb_only_exit();
++
  	ksu_selinux_hide_exit();
 -	ksu_lsm_hook_exit();
 +
