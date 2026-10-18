@@ -1,9 +1,9 @@
-diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c.2
+diff --git a/kernel/feature/sucompat.c.1 b/kernel/feature/sucompat.c
 old mode 100644
 new mode 100755
-index a60b0a71..1e58786c
---- a/kernel/feature/sucompat.c
-+++ b/kernel/feature/sucompat.c.2
+index a60b0a71..74151208
+--- a/kernel/feature/sucompat.c.1
++++ b/kernel/feature/sucompat.c
 @@ -24,28 +24,39 @@
  #include "klog.h" // IWYU pragma: keep
  #include "runtime/ksud.h"
@@ -49,7 +49,7 @@ index a60b0a71..1e58786c
  	pr_info("su_compat: set to %d\n", enable);
  	return 0;
  }
-@@ -71,209 +82,221 @@ static char __user *ksud_user_path(void)
+@@ -71,209 +82,220 @@ static char __user *ksud_user_path(void)
  	return userspace_stack_buffer(ksud_path, sizeof(ksud_path));
  }
  
@@ -291,7 +291,6 @@ index a60b0a71..1e58786c
  
 -	if (likely(memcmp(path, su_path, sizeof(su_path))))
 -		goto do_orig_execve;
-+    ksu_compat_sulog('x');
 +    pending_sucompat = ksu_sulog_capture_sucompat(filename->name, (struct user_arg_ptr*)argv_user, GFP_KERNEL);
  
 -	ksu_compat_sulog('x');
