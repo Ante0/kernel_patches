@@ -1,5 +1,5 @@
-diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
-index 3118f115..e0044a21 100644
+diff --git a/kernel/supercall/dispatch.c.1 b/kernel/supercall/dispatch.c
+index ac70b16b..e0044a21 100644
 --- a/kernel/supercall/dispatch.c
 +++ b/kernel/supercall/dispatch.c
 @@ -50,9 +50,6 @@ static int do_get_info(void __user *arg)
@@ -12,7 +12,7 @@ index 3118f115..e0044a21 100644
  #endif
  
      if (ksuver_override)
-@@ -61,9 +58,6 @@ static int do_get_info(void __user *arg)
+@@ -61,11 +58,8 @@ static int do_get_info(void __user *arg)
      if (is_manager()) {
          cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
      }
@@ -20,8 +20,11 @@ index 3118f115..e0044a21 100644
 -        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
 -    }
      // A late load never sees PID 1's selinux_setup, so preinit cannot run.
-     if (ksu_preinit_enabled_param()) {
+-    if (ksu_preinit_enabled_param() && !ksu_late_loaded) {
++    if (ksu_preinit_enabled_param()) {
          cmd.flags |= KSU_GET_INFO_FLAG_PREINIT;
+     }
+     cmd.features = KSU_FEATURE_MAX;
 @@ -85,17 +79,11 @@ static int do_get_info_legacy(void __user *arg)
  
  #ifdef MODULE
