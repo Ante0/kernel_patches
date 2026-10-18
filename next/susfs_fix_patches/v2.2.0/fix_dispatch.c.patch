@@ -1,8 +1,6 @@
-diff --git a/kernel/supercall/dispatch.c.1 b/kernel/supercall/dispatch.c
-old mode 100644
-new mode 100755
-index ac70b16b..f36c83c4
---- a/kernel/supercall/dispatch.c.1
+diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
+index 3118f115..e0044a21 100644
+--- a/kernel/supercall/dispatch.c
 +++ b/kernel/supercall/dispatch.c
 @@ -50,9 +50,6 @@ static int do_get_info(void __user *arg)
  
@@ -14,7 +12,7 @@ index ac70b16b..f36c83c4
  #endif
  
      if (ksuver_override)
-@@ -61,11 +58,8 @@ static int do_get_info(void __user *arg)
+@@ -61,9 +58,6 @@ static int do_get_info(void __user *arg)
      if (is_manager()) {
          cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
      }
@@ -22,11 +20,8 @@ index ac70b16b..f36c83c4
 -        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
 -    }
      // A late load never sees PID 1's selinux_setup, so preinit cannot run.
--    if (ksu_preinit_enabled_param() && !ksu_late_loaded) {
-+    if (ksu_preinit_enabled_param()) {
+     if (ksu_preinit_enabled_param()) {
          cmd.flags |= KSU_GET_INFO_FLAG_PREINIT;
-     }
-     cmd.features = KSU_FEATURE_MAX;
 @@ -85,17 +79,11 @@ static int do_get_info_legacy(void __user *arg)
  
  #ifdef MODULE
@@ -45,16 +40,3 @@ index ac70b16b..f36c83c4
      cmd.features = KSU_FEATURE_MAX;
  
      if (copy_to_user(arg, &cmd, sizeof(cmd))) {
-@@ -778,11 +766,7 @@ static int do_get_hook_mode(void __user *arg)
- {
-     struct ksu_get_hook_mode_cmd cmd = {0};
- 
--#ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
--    strscpy(cmd.mode, "Tracepoint", sizeof(cmd.mode));
--#else
--    strscpy(cmd.mode, "Kprobes", sizeof(cmd.mode));
--#endif
-+    strscpy(cmd.mode, "Inline (SuSFS)", sizeof(cmd.mode));
- 
-     if (copy_to_user(arg, &cmd, sizeof(cmd))) {
-         pr_err("get_hook_mode: copy_to_user failed\n");
