@@ -1,21 +1,19 @@
 diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
-old mode 100644
-new mode 100755
-index 3dc6dc8c..df6b36fc
+index 6274c47d..3d18fe81 100644
 --- a/kernel/feature/sucompat.c
 +++ b/kernel/feature/sucompat.c
-@@ -24,28 +24,39 @@
+@@ -21,30 +24,40 @@
  #include "klog.h" // IWYU pragma: keep
  #include "runtime/ksud.h"
  #include "feature/sucompat.h"
 +#include "feature/adb_root.h"
  #include "policy/app_profile.h"
- #include "hook/syscall_hook.h"
+-#include "hook/syscall_hook.h"
  #include "supercall/supercall.h"
  #include "sulog/event.h"
 -#include "ksu.h"
- #include "util.h"
 +#include "uapi/sulog.h"
+ #include "util.h"
  
  #define SU_PATH "/system/bin/su"
  #define SH_PATH "/system/bin/sh"
@@ -40,16 +38,21 @@ index 3dc6dc8c..df6b36fc
  
  static int su_compat_feature_set(u64 value)
  {
- 	bool enable = value != 0;
+-	bool enable = value != 0;
 -	ksu_su_compat_enabled = enable;
-+	if (enable)
-+		static_branch_enable(&ksu_su_compat_enabled);
-+	else
-+		static_branch_disable(&ksu_su_compat_enabled);
- 	pr_info("su_compat: set to %d\n", enable);
- 	return 0;
+-	pr_info("su_compat: set to %d\n", enable);
+-	return 0;
++    bool enable = value != 0;
++    if (enable)
++        static_branch_enable(&ksu_su_compat_enabled);
++    else
++        static_branch_disable(&ksu_su_compat_enabled);
++    pr_info("su_compat: set to %d\n", enable);
++    return 0;
  }
-@@ -57,6 +68,13 @@ static const struct ksu_feature_handler su_compat_handler = {
+ 
+ static const struct ksu_feature_handler su_compat_handler = {
+@@ -54,6 +67,13 @@ static const struct ksu_feature_handler su_compat_handler = {
  	.set_handler = su_compat_feature_set,
  };
  
@@ -63,97 +66,30 @@ index 3dc6dc8c..df6b36fc
  static char __user *ksud_user_path(void)
  {
  	static const char ksud_path[] = KSUD_PATH;
-@@ -64,209 +82,197 @@ static char __user *ksud_user_path(void)
+@@ -61,212 +81,179 @@ static char __user *ksud_user_path(void)
  	return userspace_stack_buffer(ksud_path, sizeof(ksud_path));
  }
  
 -static char __user *empty_user_path(void)
+-{
+-	return userspace_stack_buffer("", sizeof(""));
+-}
 +/*
 + * return 0 -> No further checks should be required afterwards
 + * return non-zero -> Further checks should be continued afterwards
 + */
-+int ksu_handle_execveat_init(struct filename *filename,
-+                             struct user_arg_ptr *argv_user,
-+                             struct user_arg_ptr *envp_user)
- {
--	return userspace_stack_buffer("", sizeof(""));
-+    int ret;
-+
-+    if (current->pid == 1)
-+        return -EINVAL;
-+
-+    if (!is_init(get_current_cred()))
-+        return -EINVAL;
-+
-+    if (unlikely(!strcmp(filename->name, KSUD_PATH))) {
-+        const char __user *argv_user_ptr = get_user_arg_ptr(*argv_user, 0);
-+        struct ksu_sulog_pending_event *pending_sucompat = NULL;
-+
-+        pr_info("hook_manager: escape to root for init executing ksud: %d\n",
-+                current->pid);
-+        pending_sucompat = ksu_sulog_capture_sucompat(
-+            filename->name, argv_user, GFP_KERNEL);
-+
-+        ret = escape_to_root_for_init();
-+        if (ret) {
-+            pr_err("escape_to_root_for_init() failed: %d\n", ret);
-+            return ret;
-+        }
-+
-+        if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
-+            pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\n");
-+            return 0;
-+        }
-+
-+        ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
-+        return 0;
-+    }
-+
-+    if (likely(!strstr(filename->name, "/app_process") &&
-+               !strstr(filename->name, "/adbd") &&
-+               !strstr(filename->name, "/stub_zygote"))) {
-+        pr_info("susfs: mark no sucompat checks for pid: '%d', exec: '%s'\n",
-+                current->pid, filename->name);
-+        susfs_set_current_proc_no_su();
-+        // - marking proc umounted here is useless because only zygote spawned
-+        //   processes will umount the sus mounts, tho other susfs features
-+        //   still rely on proc_umounted check, but it is fine to not spoof for
-+        //   init spawned processes.
-+        return 0;
-+    }
-+
-+#ifdef CONFIG_COMPAT
-+    if (unlikely(envp_user->is_compat))
-+        ret = ksu_adb_root_handle_execveat(
-+            filename->name, (void ***)&envp_user->ptr.compat);
-+    else
-+        ret = ksu_adb_root_handle_execveat(
-+            filename->name, (void ***)&envp_user->ptr.native);
-+#else
-+    ret = ksu_adb_root_handle_execveat(
-+        filename->name, (void ***)&envp_user->ptr.native);
-+#endif
-+
-+    if (ret)
-+        pr_err("adb root failed: %d\n", ret);
-+
-+    return ret;
- }
++int ksu_handle_execveat_init(struct filename *filename, struct user_arg_ptr *argv_user, struct user_arg_ptr *envp_user) {
++	int ret;
  
 -static const char su_path[] = SU_PATH;
--
++    if (current->pid == 1)
++        return -EINVAL;
+ 
 -static bool is_ksud_exists()
-+// The call from execve_handler_pre won't provide correct value for
-+// __never_use_argument; use them after fixing execve_handler_pre, keeping
-+// them for consistency for manually patched code.
-+int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
-+                                 void *argv_user, void *envp_user,
-+                                 int *__never_use_flags)
- {
+-{
 -	struct path path;
-+    struct filename *filename;
-+    struct ksu_sulog_pending_event *pending_sucompat = NULL;
-+    int ret;
++    if (!is_init(get_current_cred()))
++        return -EINVAL;
  
 -	if (kern_path(KSUD_PATH, 0, &path) < 0) {
 -		return false;
@@ -161,24 +97,20 @@ index 3dc6dc8c..df6b36fc
 -	path_put(&path);
 -	return true;
 -}
-+    if (unlikely(!filename_ptr))
-+        return -EINVAL;
++    if (unlikely(!strcmp(filename->name, KSUD_PATH))) {
++        const char __user *argv_user_ptr = get_user_arg_ptr(*argv_user, 0);
++        struct ksu_sulog_pending_event *pending_sucompat = NULL;
  
 -long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs)
 -{
 -	const char __user **filename_user, *orig_filename;
 -	long ret;
 -	const struct cred *old_cred;
-+    filename = *filename_ptr;
-+    if (IS_ERR(filename))
-+        return -EINVAL;
- 
+-
 -	if (!ksu_is_allow_uid_for_current(current_uid().val)) {
 -		goto do_orig_facessat;
 -	}
-+    if (!ksu_handle_execveat_init(filename, (struct user_arg_ptr*)argv_user, (struct user_arg_ptr*)envp_user))
-+        return -EINVAL;
- 
+-
 -	filename_user = (const char __user **)&PT_REGS_PARM2(regs);
 -
 -	char path[sizeof(su_path) + 1];
@@ -195,37 +127,66 @@ index 3dc6dc8c..df6b36fc
 -			ret = ksu_syscall_table[orig_nr](regs);
 -			revert_creds(old_cred);
 -			*filename_user = orig_filename;
--			return ret;
++        pr_info("hook_manager: escape to root for init executing ksud: %d\n", current->pid);
++        pending_sucompat = ksu_sulog_capture_sucompat(filename->name, argv_user, GFP_KERNEL);
++        ret = escape_to_root_for_init();
++        if (ret) {
++            pr_err("escape_to_root_for_init() failed: %d\n", ret);
+ 			return ret;
 -		} else {
 -			revert_creds(old_cred);
--		}
--	}
-+    if (likely(!__ksu_is_allow_uid_for_current(current_uid().val)))
-+        return -EINVAL;
+ 		}
++        if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
++            pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\n");
++            return 0;
++        }
++        ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
++        return 0;
++	}
++    if (likely(!strstr(filename->name, "/app_process") && !strstr(filename->name, "/adbd") && !strstr(filename->name, "/stub_zygote"))) {
++        pr_info("susfs: mark no sucompat checks for pid: '%d', exec: '%s'\n", current->pid, filename->name);
++        susfs_set_current_proc_no_su();
++        // - marking proc umounted here is useless because only zygote spawned processes will umount
++        //   the sus mounts, tho other susfs features still rely on proc_umounted check, but
++        //   it is fine to not spoof for init spawned processes.
++        return 0;
+ 	}
  
 -do_orig_facessat:
 -	return ksu_syscall_table[orig_nr](regs);
--}
-+    if (likely(memcmp(filename->name, su_path, sizeof(su_path))))
-+        return -EINVAL;
++#ifdef CONFIG_COMPAT
++    if (unlikely(envp_user->is_compat))
++        ret = ksu_adb_root_handle_execveat(filename->name, (void ***)&envp_user->ptr.compat);
++    else
++        ret = ksu_adb_root_handle_execveat(filename->name, (void ***)&envp_user->ptr.native);
++#else
++        ret = ksu_adb_root_handle_execveat(filename->name, (void ***)&envp_user->ptr.native);
++#endif
++
++    if (ret)
++        pr_err("adb root failed: %d\n", ret);
++
++    return ret;
+ }
  
 -long ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs)
--{
++// the call from execve_handler_pre won't provided correct value for __never_use_argument, use them after fix execve_handler_pre, keeping them for consistence for manually patched code
++int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
++                 void *argv_user, void *envp_user,
++                 int *flags)
+ {
 -	const char __user **filename_user, *orig_filename;
 -	long ret;
 -	const struct cred *old_cred;
-+    if (current_chrooted())
-+    {
-+        pr_err("ksu_handle_execveat_sucompat: su found but NOT allowed! Because current process is running in chrooted environment\n");
-+        return -EINVAL;
-+    }
++	struct filename *filename;
++	struct ksu_sulog_pending_event *pending_sucompat = NULL;
++	int ret;
  
 -	if (!ksu_is_allow_uid_for_current(current_uid().val)) {
 -		goto do_orig_stat;
 -	}
-+    ret = escape_with_root_profile();
-+    pr_info("ksu_handle_execveat_sucompat: su->ksud!\n");
-+    memcpy((void *)filename->name, ksud_path, sizeof(ksud_path));
++	if (unlikely(!filename_ptr))
++		return -EINVAL;
  
 -	filename_user = (const char __user **)&PT_REGS_PARM2(regs);
 -
@@ -248,32 +209,20 @@ index 3dc6dc8c..df6b36fc
 -			revert_creds(old_cred);
 -		}
 -	}
-+    pending_sucompat = ksu_sulog_capture_sucompat(filename->name, (struct user_arg_ptr*)argv_user, GFP_KERNEL);
++	filename = *filename_ptr;
++	if (IS_ERR(filename))
++		return -EINVAL;
  
 -do_orig_stat:
 -	return ksu_syscall_table[orig_nr](regs);
-+    const char __user *argv_user_ptr = get_user_arg_ptr(*((struct user_arg_ptr*)argv_user), 0);
-+    if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
-+        pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\n");
-+        return -EINVAL;
-+    }
-+
-+    ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
-+
-+    if (ret) {
-+        pr_err("escape_with_root_profile() failed: %d\n", ret);
-+        return -EINVAL;
-+    }
-+    return 0;
- }
+-}
++	if (!ksu_handle_execveat_init(filename, (struct user_arg_ptr*)argv_user, (struct user_arg_ptr*)envp_user))
++		return -EINVAL;
  
 -static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
 -					      const char __user *const __user *argv_user, unsigned long envp,
 -					      bool execveat, int orig_nr, struct pt_regs *regs)
-+int ksu_handle_post_execveat_sucompat(int *fd, struct filename **filename_ptr,
-+                 void *argv_user, void *envp_user,
-+                 int *flags, int *retval)
- {
+-{
 -	const char __user *fn;
 -	struct ksu_sulog_pending_event *pending_sucompat = NULL;
 -	char path[sizeof(su_path) + 1];
@@ -301,32 +250,33 @@ index 3dc6dc8c..df6b36fc
 -	if (ret < 0) {
 -		pr_warn("Access filename when execve failed: %ld", ret);
 -		goto do_orig_execve;
--	}
-+    if (*retval >= 0) {
-+        (void)ksu_install_su_fd();
-+    }
-+    return 0;
-+}
++	if (likely(!__ksu_is_allow_uid_for_current(current_uid().val)))
++		return -EINVAL;
++
++	if (likely(memcmp(filename->name, su_path, sizeof(su_path))))
++		return -EINVAL;
++
++	if (current_chrooted())
++	{
++		pr_err("ksu_handle_execveat_sucompat: su found but NOT allowed! Because current process is running in chrooted environment\n");
++		return -EINVAL;
+ 	}
  
 -	if (likely(memcmp(path, su_path, sizeof(su_path))))
 -		goto do_orig_execve;
-+extern struct static_key_true is_first_zygote;
++	ret = escape_with_root_profile();
  
 -	ksu_compat_sulog('x');
 -	pr_info("sys_execve su found\n");
-+int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
-+                        void *envp, int *flags)
-+{
-+    if (static_branch_unlikely(&is_first_zygote))
-+        (void)ksu_handle_execveat_ksud(fd, filename_ptr, argv, envp, flags);
++	pr_info("ksu_handle_execveat_sucompat: su->ksud!\n");
++	memcpy((void *)filename->name, ksud_path, sizeof(ksud_path));
  
 -	tmp_fd = get_unused_fd_flags(O_CLOEXEC);
 -	if (tmp_fd < 0) {
 -		pr_err("alloc tmp fd err: %d\n", tmp_fd);
 -		goto do_orig_execve;
 -	}
-+    return ksu_handle_execveat_sucompat(fd, filename_ptr, argv, envp, flags);
-+}
++	pending_sucompat = ksu_sulog_capture_sucompat(filename->name, (struct user_arg_ptr*)argv_user, GFP_KERNEL);
  
 -	old_cred = override_creds(ksu_cred);
 -	ksud_file = filp_open(KSUD_PATH, O_PATH, 0);
@@ -335,12 +285,11 @@ index 3dc6dc8c..df6b36fc
 -		pr_err("open ksud err: %ld\n", PTR_ERR(ksud_file));
 -		put_unused_fd(tmp_fd);
 -		goto do_orig_execve;
--	}
-+int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode,
-+                         int *__unused_flags)
-+{
-+    if (unlikely(IS_ERR(*filename) || (*filename)->name == NULL))
-+        return 0;
++	const char __user *argv_user_ptr = get_user_arg_ptr(*((struct user_arg_ptr*)argv_user), 0);
++	if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
++		pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\n");
++		return -EINVAL;
+ 	}
  
 -	fd_install(tmp_fd, ksud_file);
 -
@@ -357,13 +306,18 @@ index 3dc6dc8c..df6b36fc
 -	regs->__PT_PARM3_REG = (unsigned long)argv_user;
 -	regs->__PT_PARM2_REG = empty_user_path();
 -	PT_REGS_SYSCALL_PARM1(regs) = tmp_fd;
--
++	ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
+ 
 -	ret = escape_with_root_profile();
--	if (ret) {
+ 	if (ret) {
 -		pr_err("escape_with_root_profile failed: %ld\n", ret);
--	}
++		pr_err("escape_with_root_profile() failed: %d\n", ret);
++		return -EINVAL;
+ 	}
 -	ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
--
++	return 0;
++}
+ 
 -	ret = ksu_syscall_table[__NR_execveat](regs);
 -	if (ret < 0) {
 -		ksu_close_fd(tmp_fd);
@@ -379,57 +333,83 @@ index 3dc6dc8c..df6b36fc
 -		if (su_fd < 0) {
 -			pr_warn("install su session fd failed: %d\n", su_fd);
 -		}
--	}
++int ksu_handle_post_execveat_sucompat(int *fd, struct filename **filename_ptr,
++                 void *argv_user, void *envp_user,
++                 int *flags, int *retval)
++{
++	if (*retval >= 0) {
++		(void)ksu_install_su_fd();
+ 	}
 -	return ret;
-+    if (likely(memcmp((*filename)->name, su_path, sizeof(su_path))))
-+        return 0;
- 
+-
 -do_orig_execve:
 -	return ksu_syscall_table[orig_nr](regs);
--}
-+    if (current_chrooted()) {
-+        pr_err("ksu_handle_faccessat: su found but NOT allowed! "
-+               "Because current process is running in chrooted environment\n");
-+        return 0;
-+    }
++	return 0;
+ }
  
 -long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs)
--{
++extern struct static_key_true is_first_zygote;
++
++int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
++            void *envp, int *flags)
+ {
 -	return ksu_handle_execve_sucompat_common(filename_user, (const char __user *const __user *)PT_REGS_PARM2(regs),
 -						 PT_REGS_PARM3(regs), false, orig_nr, regs);
-+    pr_info("ksu_handle_faccessat: su->sh!\n");
-+    memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
-+    return 0;
++	if (static_branch_unlikely(&is_first_zygote))
++		(void)ksu_handle_execveat_ksud(fd, filename_ptr, argv, envp, flags);
++
++	return ksu_handle_execveat_sucompat(fd, filename_ptr, argv, envp,
++				flags);
  }
  
 -long ksu_handle_execveat_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs)
-+int ksu_handle_stat(int *dfd, struct filename **filename, int *flags)
++int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode,
++             int *__unused_flags)
  {
 -	return ksu_handle_execve_sucompat_common(filename_user, (const char __user *const __user *)PT_REGS_PARM3(regs),
 -						 PT_REGS_SYSCALL_PARM4(regs), true, orig_nr, regs);
-+    if (unlikely(IS_ERR(*filename) || (*filename)->name == NULL))
-+        return 0;
++	if (unlikely(IS_ERR(*filename) || (*filename)->name == NULL))
++		return 0;
 +
-+    if (likely(memcmp((*filename)->name, su_path, sizeof(su_path))))
-+        return 0;
++	if (likely(memcmp((*filename)->name, su_path, sizeof(su_path))))
++		return 0;
 +
-+    if (current_chrooted()) {
-+        pr_err("ksu_handle_stat: su found but NOT allowed! "
-+               "Because current process is running in chrooted environment\n");
-+        return 0;
-+    }
++	if (current_chrooted())
++	{
++		pr_err("ksu_handle_faccessat: su found but NOT allowed! Because current process is running in chrooted environment\n");
++		return 0;
++	}
 +
-+    pr_info("ksu_handle_stat: su->sh!\n");
-+    memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
-+    return 0;
++	pr_info("ksu_handle_faccessat: su->sh!\n");
++	memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
++	return 0;
++}
++
++int ksu_handle_stat(int *dfd, struct filename **filename, int *flags) {
++	if (unlikely(IS_ERR(*filename) || (*filename)->name == NULL))
++		return 0;
++
++	if (likely(memcmp((*filename)->name, su_path, sizeof(su_path))))
++		return 0;
++
++	if (current_chrooted())
++	{
++		pr_err("ksu_handle_stat: su found but NOT allowed! Because current process is running in chrooted environment\n");
++		return 0;
++	}
++
++	pr_info("ksu_handle_stat: su->sh!\n");
++	memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
++	return 0;
  }
  
  // sucompat: permitted process can execute 'su' to gain root access.
  void __init ksu_sucompat_init()
  {
-+	pr_info("su_compat: initial enabled=%d\n",
-+	        static_key_enabled(&ksu_su_compat_enabled));
-+
- 	if (ksu_register_feature_handler(&su_compat_handler)) {
+-	if (ksu_register_feature_handler(&su_compat_handler)) {
++	if (ksu_register_feature_handler(&su_compat_handler))
  		pr_err("Failed to register su_compat feature handler\n");
- 	}
+-	}
+ }
+ 
+ void __exit ksu_sucompat_exit()

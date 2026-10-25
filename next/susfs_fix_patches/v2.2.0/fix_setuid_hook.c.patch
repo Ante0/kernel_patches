@@ -1,5 +1,5 @@
 diff --git a/kernel/hook/setuid_hook.c b/kernel/hook/setuid_hook.c
-index ff23202..1f1e91b 100755
+index ff232021..1f1e91be 100644
 --- a/kernel/hook/setuid_hook.c
 +++ b/kernel/hook/setuid_hook.c
 @@ -20,44 +20,138 @@

@@ -1,5 +1,5 @@
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index f2599fe..6c2687d 100755
+index 04c79a20..e26c20d8 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
 @@ -7,75 +7,8 @@
