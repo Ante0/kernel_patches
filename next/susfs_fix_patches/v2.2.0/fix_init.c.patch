@@ -1,6 +1,6 @@
-diff --git a/kernel/core/init.c b/kernel/core/init.c
-index 385cce79..d152a83e 100644
---- a/kernel/core/init.c
+diff --git a/kernel/core/init.c.1 b/kernel/core/init.c
+index 3588c0e0..5f3a6a9b 100644
+--- a/kernel/core/init.c.1
 +++ b/kernel/core/init.c
 @@ -5,6 +5,7 @@
  #include <linux/rcupdate.h>
@@ -46,8 +46,8 @@ index 385cce79..d152a83e 100644
 -
  int __init kernelsu_init(void)
  {
- #ifdef KSU_MANAGER_PACKAGE
-@@ -96,28 +84,6 @@ int __init kernelsu_init(void)
+ 	int ret;
+@@ -98,28 +86,6 @@ int __init kernelsu_init(void)
  #else
  	pr_info("welcome to KernelSU version " __stringify(KERNEL_SU_VERSION) "\n");
  #endif
@@ -76,19 +76,20 @@ index 385cce79..d152a83e 100644
  #ifdef CONFIG_KSU_DEBUG
  	pr_alert("*************************************************************");
  	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
-@@ -127,6 +93,7 @@ int __init kernelsu_init(void)
- 	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
- 	pr_alert("*************************************************************");
- #endif
-+
- 	if (allow_shell) {
- 		pr_alert("shell is allowed at init!");
- 	}
-@@ -137,86 +104,46 @@ int __init kernelsu_init(void)
+@@ -139,95 +105,46 @@ int __init kernelsu_init(void)
  		return -ENOSYS;
  	}
  
+-	pr_info("initializing symbol resolver\n");
 -	ksu_init_symbol_resolver();
+-
+-	ret = ksu_selinux_inode_init();
+-	if (ret) {
+-		put_cred(ksu_cred);
+-		ksu_cred = NULL;
+-		return ret;
+-	}
+-
 -	ksu_syscall_hook_init();
 +#ifdef CONFIG_KSU_SUSFS
 +    susfs_init();
@@ -113,19 +114,19 @@ index 385cce79..d152a83e 100644
 -		apply_kernelsu_rules();
 -		cache_sid();
 -		setup_ksu_cred();
--
+ 
 -		// Grant current process (ksud late-load) root
 -		// with KSU SELinux domain before enforcing SELinux, so it
 -		// can continue to access /data/app etc. after enforcement.
 -		escape_to_root_for_init();
++	ksu_sucompat_init();
  
 -		ksu_allowlist_init();
 -		ksu_load_allow_list();
-+	ksu_sucompat_init();
- 
--		ksu_syscall_hook_manager_init();
 +	ksu_setuid_hook_init();
  
+-		ksu_syscall_hook_manager_init();
+-
 -		ksu_throne_tracker_init();
 -		ksu_observer_init();
 -		ksu_file_wrapper_init();
@@ -140,7 +141,7 @@ index 385cce79..d152a83e 100644
 -			pr_info("Permissive SELinux, enforcing\n");
 -			setenforce(true);
 -		}
-+	ksu_adb_root_init();
++	ksu_adb_root_init()
  
 -	} else {
 -		ksu_syscall_hook_manager_init();
@@ -187,7 +188,7 @@ index 385cce79..d152a83e 100644
  
  	// Wait for any in-flight RCU readers (e.g. handler traversing allow_list)
  	synchronize_rcu();
-@@ -229,11 +156,15 @@ void __exit kernelsu_exit(void)
+@@ -240,11 +157,15 @@ void __exit kernelsu_exit(void)
  	ksu_allowlist_exit();
  
  	ksu_shell_su_adb_only_exit();
