@@ -1,8 +1,8 @@
-diff --git a/kernel/feature/sucompat.c.1 b/kernel/feature/sucompat.c
-index 3dc6dc8c..f679d783 100644
---- a/kernel/feature/sucompat.c.1
+diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
+index 3dc6dc8c..b12eab70 100644
+--- a/kernel/feature/sucompat.c
 +++ b/kernel/feature/sucompat.c
-@@ -24,28 +24,38 @@
+@@ -24,28 +24,40 @@
  #include "klog.h" // IWYU pragma: keep
  #include "runtime/ksud.h"
  #include "feature/sucompat.h"
@@ -28,10 +28,11 @@ index 3dc6dc8c..f679d783 100644
  static int su_compat_feature_get(u64 *value)
  {
 -	*value = ksu_su_compat_enabled ? 1 : 0;
-+    if (static_key_enabled(&ksu_su_compat_enabled))
++    if (static_key_enabled(&ksu_su_compat_enabled)) {
 +        *value = 1;
 +    else
 +        *value = 0;
++    }
  	return 0;
  }
  
@@ -39,14 +40,15 @@ index 3dc6dc8c..f679d783 100644
  {
  	bool enable = value != 0;
 -	ksu_su_compat_enabled = enable;
-+    if (enable)
++    if (enable) {
 +        static_branch_enable(&ksu_su_compat_enabled);
 +    else
 +        static_branch_disable(&ksu_su_compat_enabled);
++    }
  	pr_info("su_compat: set to %d\n", enable);
  	return 0;
  }
-@@ -57,219 +67,190 @@ static const struct ksu_feature_handler su_compat_handler = {
+@@ -57,219 +69,193 @@ static const struct ksu_feature_handler su_compat_handler = {
  	.set_handler = su_compat_feature_set,
  };
  
@@ -102,6 +104,9 @@ index 3dc6dc8c..f679d783 100644
 +    if (!is_init(get_current_cred()))
 +        return -EINVAL;
 +
++    if (unlikely(!strcmp(filename->name, KSUD_PATH))) {
++        const char __user *argv_user_ptr = get_user_arg_ptr(*argv_user, 0);
++        struct ksu_sulog_pending_event *pending_sucompat = NULL;
 +        pr_info("hook_manager: escape to root for init executing ksud: %d\n", current->pid);
 +        pending_sucompat = ksu_sulog_capture_sucompat(filename->name, argv_user, GFP_KERNEL);
 +        ret = escape_to_root_for_init();
