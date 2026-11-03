@@ -1,12 +1,9 @@
 diff --git a/kernel/hook/setuid_hook.c.1 b/kernel/hook/setuid_hook.c
-index 6bcff6ad..3ccb4ae3 100644
+index 6bcff6ad..db6ec402 100644
 --- a/kernel/hook/setuid_hook.c.1
 +++ b/kernel/hook/setuid_hook.c
-@@ -20,37 +20,132 @@
- #include "manager/manager_identity.h"
- #include "infra/seccomp_cache.h"
- #include "supercall/supercall.h"
--#include "hook/tp_marker.h"
+@@ -23,38 +23,135 @@
+ #include "hook/tp_marker.h"
  #include "feature/kernel_umount.h"
  
 -int ksu_handle_setresuid(uid_t old_uid, uid_t new_uid)
@@ -86,10 +83,10 @@ index 6bcff6ad..3ccb4ae3 100644
 +        // Handle extra susfs work
 +        ksu_handle_extra_susfs_work();
 +    }
-+
-+    return 0;
-+}
-+
+ 
+     return 0;
+ }
+ 
 +static int handle_zygote_next_setresuid(uid_t ruid) {
 +    // Check if spawned process is isolated service first, and force to do umount if so
 +    if (is_isolated_process(ruid)) {
@@ -98,7 +95,7 @@ index 6bcff6ad..3ccb4ae3 100644
 +        susfs_set_current_proc_umounted_for_zygote_next();
 +        goto do_susfs_work;
 +    }
-+ 
++
 +    // - Since ksu maanger app uid is excluded in allow_list_arr, so ksu_uid_should_umount(manager_uid)
 +    //   will always return true, that's why we need to explicitly check if new_uid belongs to
 +    //   ksu manager.
@@ -152,6 +149,11 @@ index 6bcff6ad..3ccb4ae3 100644
 +
 +    if (susfs_is_sid_equal(current_cred(), susfs_zygote_next_sid))
 +        return handle_zygote_next_setresuid(ruid);
- 
-     return 0;
- }
++
++    return 0;
++
++}
++
+ void __init ksu_setuid_hook_init(void)
+ {
+     ksu_kernel_umount_init();

@@ -1,6 +1,6 @@
-diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index 04c79a20..e26c20d8 100644
---- a/kernel/selinux/selinux.c
+diff --git a/kernel/selinux/selinux.c.1 b/kernel/selinux/selinux.c
+index 24721501..e847119c 100644
+--- a/kernel/selinux/selinux.c.1
 +++ b/kernel/selinux/selinux.c
 @@ -7,75 +7,8 @@
  #include "ksu.h"

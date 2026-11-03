@@ -1,5 +1,5 @@
 diff --git a/kernel/core/init.c.1 b/kernel/core/init.c
-index 3588c0e0..8ea83964 100644
+index 3588c0e0..71373c29 100644
 --- a/kernel/core/init.c.1
 +++ b/kernel/core/init.c
 @@ -5,6 +5,7 @@
@@ -18,11 +18,13 @@ index 3588c0e0..8ea83964 100644
  #include "feature/adb_root.h"
  #include "feature/selinux_hide.h"
  #include "feature/module_blacklist.h"
-@@ -26,14 +26,8 @@
+@@ -26,14 +26,9 @@
  #include "feature/sulog.h"
  #include "infra/symbol_resolver.h"
  #include "preinit/preinit.h"
--
++#include "hook/setuid_hook.h"
++#include "feature/sucompat.h"
+ 
 -#if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
 -#include <asm/cpufeature.h>
 -#include <linux/version.h>
@@ -30,12 +32,10 @@ index 3588c0e0..8ea83964 100644
 -#error "FATAL: Your kernel is missing the indirect syscall bypass patches!"
 -#endif
 -#endif
-+#include "hook/setuid_hook.h"
-+#include "feature/sucompat.h"
  
  // workaround for A12-5.10 kernel
  // Some third-party kernel (e.g. linegaeOS) uses wrong toolchain, which supports
-@@ -84,11 +78,6 @@ module_param(allow_shell, bool, 0);
+@@ -84,11 +79,6 @@ module_param(allow_shell, bool, 0);
  bool ksu_no_custom_rc = false;
  module_param_named(norc, ksu_no_custom_rc, bool, 0);
  
@@ -47,7 +47,7 @@ index 3588c0e0..8ea83964 100644
  int __init kernelsu_init(void)
  {
  	int ret;
-@@ -98,27 +87,6 @@ int __init kernelsu_init(void)
+@@ -98,27 +88,6 @@ int __init kernelsu_init(void)
  #else
  	pr_info("welcome to KernelSU version " __stringify(KERNEL_SU_VERSION) "\n");
  #endif
@@ -75,93 +75,85 @@ index 3588c0e0..8ea83964 100644
  
  #ifdef CONFIG_KSU_DEBUG
  	pr_alert("*************************************************************");
-@@ -133,101 +101,46 @@ int __init kernelsu_init(void)
+@@ -129,6 +98,7 @@ int __init kernelsu_init(void)
+ 	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+ 	pr_alert("*************************************************************");
+ #endif
++
+ 	if (allow_shell) {
  		pr_alert("shell is allowed at init!");
  	}
+@@ -149,85 +119,49 @@ int __init kernelsu_init(void)
+ 		return ret;
+ 	}
  
--	ksu_cred = prepare_creds();
--	if (!ksu_cred) {
--		pr_err("prepare cred failed!\n");
--		return -ENOSYS;
--	}
--
--	pr_info("initializing symbol resolver\n");
--	ksu_init_symbol_resolver();
+-	ksu_syscall_hook_init();
 +#ifdef CONFIG_KSU_SUSFS
 +    susfs_init();
 +#endif // #ifdef KSU_SUSFS
  
--	ret = ksu_selinux_inode_init();
--	if (ret) {
--		put_cred(ksu_cred);
--		ksu_cred = NULL;
--		return ret;
--	}
--
--	ksu_syscall_hook_init();
--
 -	// Block modules early, before vendor modules are loaded in second stage.
  	ksu_module_blacklist_init();
  
--	ksu_feature_init();
+ 	ksu_feature_init();
 -	ksu_sulog_init();
 -	ksu_adb_root_init();
 -	ksu_lsm_hook_init();
 -	ksu_selinux_hide_init();
 -	ksu_shell_su_adb_only_init();
--
+ 
  	ksu_supercalls_init();
 -	ksu_app_profile_init();
- 
+-
 -	if (ksu_late_loaded) {
 -		pr_info("late load mode, skipping kprobe hooks\n");
-+    ksu_sucompat_init();
  
 -		apply_kernelsu_rules();
 -		cache_sid();
 -		setup_ksu_cred();
-+    ksu_setuid_hook_init();
++    ksu_sucompat_init();
  
 -		// Grant current process (ksud late-load) root
 -		// with KSU SELinux domain before enforcing SELinux, so it
 -		// can continue to access /data/app etc. after enforcement.
 -		escape_to_root_for_init();
-+    ksu_sulog_init();
++    ksu_setuid_hook_init();
  
 -		ksu_allowlist_init();
 -		ksu_load_allow_list();
-+    ksu_adb_root_init();
++    ksu_sulog_init();
  
 -		ksu_syscall_hook_manager_init();
-+    ksu_selinux_hide_init();
++    ksu_adb_root_init();
  
 -		ksu_throne_tracker_init();
 -		ksu_observer_init();
 -		ksu_file_wrapper_init();
-+    ksu_shell_su_adb_only_init();
++    ksu_selinux_hide_init();
  
 -		ksu_boot_completed = true;
 -		track_throne(false);
-+	ksu_allowlist_init();
++    ksu_shell_su_adb_only_init();
  
 -		ksu_feature_apply_forced();
-+	ksu_throne_tracker_init();
++	ksu_allowlist_init();
  
 -		if (!getenforce()) {
 -			pr_info("Permissive SELinux, enforcing\n");
 -			setenforce(true);
 -		}
-+	ksu_ksud_init();
++	ksu_throne_tracker_init();
  
 -	} else {
 -		ksu_syscall_hook_manager_init();
-+	ksu_preinit_init();
++	ksu_ksud_init();
  
 -		ksu_allowlist_init();
-+	ksu_file_wrapper_init();
++	ksu_preinit_init();
  
 -		ksu_throne_tracker_init();
--
++	ksu_file_wrapper_init();
+ 
 -		ksu_ksud_init();
 -
 -		ksu_preinit_init();
@@ -188,13 +180,14 @@ index 3588c0e0..8ea83964 100644
 -		ksu_ksud_exit();
 -		ksu_preinit_exit();
 -	}
-+    ksu_ksud_exit();
++	ksu_ksud_exit();
 +
-+    ksu_preinit_exit();
++	ksu_preinit_exit();
++
  
  	// Wait for any in-flight RCU readers (e.g. handler traversing allow_list)
  	synchronize_rcu();
-@@ -240,11 +153,15 @@ void __exit kernelsu_exit(void)
+@@ -240,11 +174,15 @@ void __exit kernelsu_exit(void)
  	ksu_allowlist_exit();
  
  	ksu_shell_su_adb_only_exit();

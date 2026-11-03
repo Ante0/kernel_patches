@@ -1,8 +1,8 @@
-diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
-index b12eab70..d09dd576 100644
---- a/kernel/feature/sucompat.c
+diff --git a/kernel/feature/sucompat.c.1 b/kernel/feature/sucompat.c
+index ce428ab3..c0322f1f 100644
+--- a/kernel/feature/sucompat.c.1
 +++ b/kernel/feature/sucompat.c
-@@ -228,6 +228,7 @@ int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode,
+@@ -230,6 +230,7 @@ int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode,
          return 0;
      }
  
@@ -10,7 +10,7 @@ index b12eab70..d09dd576 100644
      pr_info("ksu_handle_faccessat: su->sh!\n");
      memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
      return 0;
-@@ -246,6 +247,7 @@ int ksu_handle_stat(int *dfd, struct filename **filename, int *flags) {
+@@ -248,6 +249,7 @@ int ksu_handle_stat(int *dfd, struct filename **filename, int *flags) {
          return 0;
      }
  
@@ -18,11 +18,11 @@ index b12eab70..d09dd576 100644
      pr_info("ksu_handle_stat: su->sh!\n");
      memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
      return 0;
-diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
-index cdcbb690..ba73743a 100644
---- a/kernel/supercall/dispatch.c
+diff --git a/kernel/supercall/dispatch.c.1 b/kernel/supercall/dispatch.c
+index 14611a9a..498814e6 100644
+--- a/kernel/supercall/dispatch.c.1
 +++ b/kernel/supercall/dispatch.c
-@@ -495,6 +495,67 @@ static int do_manage_mark(void __user *arg)
+@@ -496,6 +496,67 @@ static int do_manage_mark(void __user *arg)
      return 0;
  }
  
@@ -90,7 +90,7 @@ index cdcbb690..ba73743a 100644
  int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
  {
      if (magic1 != KSU_INSTALL_MAGIC1) {
-@@ -578,7 +639,7 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
+@@ -579,7 +640,7 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
      if (magic2 == KSU_INSTALL_MAGIC2)
          return ksu_supercall_reboot_handler(arg);
  

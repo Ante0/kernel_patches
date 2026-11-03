@@ -1,8 +1,8 @@
-diff --git a/kernel/supercall/supercall.c b/kernel/supercall/supercall.c
-index 46ee79ce..15f90d6a 100644
---- a/kernel/supercall/supercall.c
+diff --git a/kernel/supercall/supercall.c.1 b/kernel/supercall/supercall.c
+index 46ee79ce..421ef4dc 100644
+--- a/kernel/supercall/supercall.c.1
 +++ b/kernel/supercall/supercall.c
-@@ -119,169 +119,31 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
+@@ -119,169 +119,30 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
      kfree(tw);
  }
  
@@ -15,9 +15,8 @@ index 46ee79ce..15f90d6a 100644
 -    unsigned int cmd = (unsigned int)PT_REGS_PARM3(real_regs);
 -    unsigned long arg4 = (unsigned long)PT_REGS_SYSCALL_PARM4(real_regs);
 -    unsigned long reply = (unsigned long)arg4;
-+    struct ksu_install_fd_tw *tw;
- 
-     /* Check if this is a request to install KSU fd */
+-
+-    /* Check if this is a request to install KSU fd */
 -    if (magic1 == KSU_INSTALL_MAGIC1 && magic2 == KSU_INSTALL_MAGIC2) {
 -        struct ksu_install_fd_tw *tw;
 -
@@ -46,7 +45,8 @@ index 46ee79ce..15f90d6a 100644
 -            if (copy_to_user((void __user *)arg4, &reply, sizeof(reply)))
 -                pr_info("sys_reboot: reply fail\n");
 -        }
--
++    struct ksu_install_fd_tw *tw;
+ 
 +    tw = kzalloc(sizeof(*tw), GFP_KERNEL);
 +    if (!tw)
          return 0;
