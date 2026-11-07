@@ -1,30 +1,8 @@
 diff --git a/kernel/selinux/rules.c.1 b/kernel/selinux/rules.c
-index ba860761..af0c5f80 100644
+index 93b7e64d..af0c5f80 100644
 --- a/kernel/selinux/rules.c.1
 +++ b/kernel/selinux/rules.c
-@@ -90,10 +90,6 @@ void apply_kernelsu_rules()
- 
-     db = &pol->policydb;
- 
--    pol->latest_granting = old_pol->latest_granting + 1;
--    if (!ksu_set_original_types(db, &old_pol->policydb, pol->latest_granting))
--        pr_warn("failed to save original type metadata, use backup lookups\n");
--
-     ksu_type(db, KERNEL_SU_DOMAIN, "domain");
-     ksu_permissive(db, KERNEL_SU_DOMAIN);
-     ksu_typeattribute(db, KERNEL_SU_DOMAIN, "mlstrustedsubject");
-@@ -172,7 +168,9 @@ void apply_kernelsu_rules()
-     synchronize_rcu();
-     ksu_destroy_sepolicy(old_pol);
- 
--    reset_avc_cache(pol->latest_granting);
-+    reset_avc_cache();
-+
-+    susfs_set_batch_sid();
- out_unlock:
-     mutex_unlock(&selinux_state.policy_mutex);
- }
-@@ -544,15 +542,12 @@ int handle_sepolicy(void __user *user_data, u64 data_len)
+@@ -542,15 +542,12 @@ int handle_sepolicy(void __user *user_data, u64 data_len)
  
      // Return value ignored: the policy is published either way.
      ksu_policydb_fixup_len(db, "handle_sepolicy");
